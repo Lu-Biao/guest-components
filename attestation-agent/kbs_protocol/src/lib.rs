@@ -79,6 +79,8 @@ impl KbsProtocolWrapper {
             .get_evidence(ehd)
             .map_err(|e| anyhow!("Get TEE evidence failed: {:?}", e))?;
 
+        log::info!("tee_pubkey.k_mod: {}", tee_pubkey.k_mod);
+
         Ok(Attestation {
             tee_pubkey,
             tee_evidence,

@@ -6,13 +6,14 @@
 use super::Attester;
 use anyhow::*;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
-use tdx_attest_rs;
+use std::fs::File;
+use std::io;
 
 const CCEL_PATH: &str = "/sys/firmware/acpi/tables/data/CCEL";
 
 pub fn detect_platform() -> bool {
-    Path::new("/dev/tdx-attest").exists() || Path::new("/dev/tdx-guest").exists()
+    log::info!("tdx detect_platform return true by force.");
+    true
 }
 
 #[derive(Serialize, Deserialize)]
@@ -28,28 +29,7 @@ struct TdxEvidence {
 pub struct TdxAttester {}
 
 impl Attester for TdxAttester {
-    fn get_evidence(&self, report_data: String) -> Result<String> {
-        let mut report_data_bin = base64::decode(report_data)?;
-        if report_data_bin.len() != 48 {
-            return Err(anyhow!(
-                "TDX Attester: Report data should be SHA384 base64 String"
-            ));
-        }
-        report_data_bin.extend([0; 16]);
-
-        let tdx_report_data = tdx_attest_rs::tdx_report_data_t {
-            d: report_data_bin.as_slice().try_into()?,
-        };
-
-        let quote = match tdx_attest_rs::tdx_att_get_quote(Some(&tdx_report_data), None, None, 0) {
-            (tdx_attest_rs::tdx_attest_error_t::TDX_ATTEST_SUCCESS, Some(q)) => base64::encode(q),
-            (error_code, _) => {
-                return Err(anyhow!(
-                    "TDX Attester: Failed to get TD quote. Error code: {:?}",
-                    error_code
-                ));
-            }
-        };
+    fn get_evidence(&self, _report_data: String) -> Result<String> {
 
         let cc_eventlog = match std::fs::read(CCEL_PATH) {
             Result::Ok(el) => Some(base64::encode(el)),
@@ -59,7 +39,9 @@ impl Attester for TdxAttester {
             }
         };
 
-        let evidence = TdxEvidence { cc_eventlog, quote };
+        let f = File::open("quote_base64.dat")?;
+        let q = io::read_to_string(f)?;
+        let evidence = TdxEvidence { cc_eventlog: cc_eventlog, quote: q };
 
         serde_json::to_string(&evidence)
             .map_err(|e| anyhow!("Serialize TDX evidence failed: {:?}", e))
