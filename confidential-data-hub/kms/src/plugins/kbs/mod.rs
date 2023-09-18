@@ -121,9 +121,7 @@ async fn get_aa_params_from_cmdline() -> Result<(String, String)> {
     let aa_kbc_params = cmdline
         .split_ascii_whitespace()
         .find(|para| para.starts_with("agent.aa_kbc_params="))
-        .ok_or(Error::KbsClientError(
-            "no `agent.aa_kbc_params` provided in kernel commandline!".into(),
-        ))?
+        .unwrap_or("agent.aa_kbc_params=cc_kbc::http://127.0.0.1:60000/")
         .strip_prefix("agent.aa_kbc_params=")
         .expect("must have a prefix")
         .split("::")

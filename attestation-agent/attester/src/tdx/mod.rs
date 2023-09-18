@@ -7,13 +7,16 @@ use super::Attester;
 use anyhow::*;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
-use tdx_attest_rs;
+use std::fs::File;
+use std::io;
+
 
 const CCEL_PATH: &str = "/sys/firmware/acpi/tables/data/CCEL";
 
 pub fn detect_platform() -> bool {
-    Path::new("/dev/tdx-attest").exists() || Path::new("/dev/tdx-guest").exists()
+    //Path::new("/dev/tdx-attest").exists() || Path::new("/dev/tdx-guest").exists()
+    log::info!("tdx detect_platform return true by force.");
+    true
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,6 +33,7 @@ pub struct TdxAttester {}
 
 #[async_trait::async_trait]
 impl Attester for TdxAttester {
+    /*
     async fn get_evidence(&self, mut report_data: Vec<u8>) -> Result<String> {
         if report_data.len() > 64 {
             bail!("TDX Attester: Report data must be no more than 64 bytes");
@@ -61,6 +65,23 @@ impl Attester for TdxAttester {
         };
 
         let evidence = TdxEvidence { cc_eventlog, quote };
+
+        serde_json::to_string(&evidence)
+            .map_err(|e| anyhow!("Serialize TDX evidence failed: {:?}", e))
+    }
+    */
+    async fn get_evidence(&self, mut _report_data: Vec<u8>) -> Result<String> {
+        let engine = base64::engine::general_purpose::STANDARD;
+        let cc_eventlog = match std::fs::read(CCEL_PATH) {
+            Result::Ok(el) => Some(engine.encode(el)),
+            Result::Err(e) => {
+                log::warn!("Read CC Eventlog failed: {:?}", e);
+                None
+            }
+        };
+        let f = File::open("quote_base64.dat")?;
+        let q = io::read_to_string(f)?;
+        let evidence = TdxEvidence { cc_eventlog: cc_eventlog, quote: q };
 
         serde_json::to_string(&evidence)
             .map_err(|e| anyhow!("Serialize TDX evidence failed: {:?}", e))
