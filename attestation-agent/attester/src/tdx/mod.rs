@@ -30,6 +30,7 @@ pub struct TdxAttester {}
 
 #[async_trait::async_trait]
 impl Attester for TdxAttester {
+
     async fn get_evidence(&self, mut report_data: Vec<u8>) -> Result<String> {
         if report_data.len() > 64 {
             bail!("TDX Attester: Report data must be no more than 64 bytes");
@@ -42,6 +43,21 @@ impl Attester for TdxAttester {
         };
 
         let engine = base64::engine::general_purpose::STANDARD;
+
+        // test extend rtmr
+        unsafe {
+            use std::mem;
+            let mut rtmr_event_buffer = [0u8; mem::size_of::<tdx_attest_rs::tdx_rtmr_event_t>()];
+            let rtmr_event = &mut *(rtmr_event_buffer.as_mut_ptr() as *mut tdx_attest_rs::tdx_rtmr_event_t);
+            rtmr_event.version = 1;
+            rtmr_event.rtmr_index = 2;
+            for i in 0..rtmr_event.extend_data.len() {
+                rtmr_event.extend_data[i] = i as u8;
+            }
+            log::info!("test tdx_att_extend rtmr_event_buffer: {:?}", rtmr_event_buffer);
+            tdx_attest_rs::tdx_att_extend(&rtmr_event_buffer);
+        }
+
         let quote = match tdx_attest_rs::tdx_att_get_quote(Some(&tdx_report_data), None, None, 0) {
             (tdx_attest_rs::tdx_attest_error_t::TDX_ATTEST_SUCCESS, Some(q)) => engine.encode(q),
             (error_code, _) => {
