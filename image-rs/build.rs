@@ -23,5 +23,19 @@ fn main() -> Result<()> {
         .run()
         .context("ttrpc build")?;
 
+    #[cfg(feature = "ttrpc-codegen")]
+    ttrpc_codegen::Codegen::new()
+        .out_dir("./src/runtime_attestation/ttrpc_proto")
+        .input("./protos/attestation-agent.proto")
+        .include("./protos")
+        .rust_protobuf()
+        .customize(ttrpc_codegen::Customize {
+            async_all: true,
+            ..Default::default()
+        })
+        .rust_protobuf_customize(ttrpc_codegen::ProtobufCustomize::default().gen_mod_rs(false))
+        .run()
+        .context("ttrpc build")?;
+
     Ok(())
 }
