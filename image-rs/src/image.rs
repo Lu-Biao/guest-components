@@ -31,6 +31,9 @@ use crate::snapshots::overlay::OverlayFs;
 #[cfg(feature = "nydus")]
 use crate::nydus::{service, utils};
 
+#[cfg(feature = "runtime-attestation")]
+use crate::runtime_attestation;
+
 /// Image security config dir contains important information such as
 /// security policy configuration file and signature verification configuration file.
 /// Therefore, it is necessary to ensure that the directory is stored in a safe place.
@@ -240,6 +243,9 @@ impl ImageClient {
             self.config.max_concurrent_download,
         )?;
         let (image_manifest, image_digest, image_config) = client.pull_manifest().await?;
+
+        #[cfg(feature = "runtime-attestation")]
+        runtime_attestation::extend_runtime_measurement(&image_digest).await?;
 
         let id = image_manifest.config.digest.clone();
 
