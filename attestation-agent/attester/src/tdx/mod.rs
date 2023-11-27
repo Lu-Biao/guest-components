@@ -7,6 +7,8 @@ use super::Attester;
 use anyhow::*;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha384};
+use std::mem;
 use std::path::Path;
 use tdx_attest_rs;
 
@@ -72,15 +74,34 @@ impl Attester for TdxAttester {
         _register_index: Option<u64>,
     ) -> Result<()> {
         for event in events {
-            match tdx_attest_rs::tdx_att_extend(&event) {
-                tdx_attest_rs::tdx_attest_error_t::TDX_ATTEST_SUCCESS => {
-                    log::debug!("TDX extend runtime measurement succeeded.")
-                }
-                error_code => {
-                    bail!(
-                        "TDX Attester: Failed to extend RTMR. Error code: {:?}",
-                        error_code
-                    );
+            unsafe {
+                let mut event_buffer = [0u8; mem::size_of::<tdx_attest_rs::tdx_rtmr_event_t>()];
+                let rtmr_event =
+                    &mut *(event_buffer.as_mut_ptr() as *mut tdx_attest_rs::tdx_rtmr_event_t);
+                rtmr_event.version = 1;
+                rtmr_event.rtmr_index = 2;
+                let mut hasher = Sha384::new();
+                hasher.update(&event);
+                let hash = hasher.finalize().to_vec();
+                rtmr_event.extend_data.copy_from_slice(&hash);
+
+                log::info!(
+                    "test tdx_att_extend event: {:?}",
+                    String::from_utf8(event).expect("Our bytes should be valid utf8")
+                );
+                log::info!("test tdx_att_extend event_buffer: {:?}", event_buffer);
+                log::info!("test tdx_att_extend hash: {:?}", hash);
+
+                match tdx_attest_rs::tdx_att_extend(&event_buffer) {
+                    tdx_attest_rs::tdx_attest_error_t::TDX_ATTEST_SUCCESS => {
+                        log::debug!("TDX extend runtime measurement succeeded.")
+                    }
+                    error_code => {
+                        bail!(
+                            "TDX Attester: Failed to extend RTMR. Error code: {:?}",
+                            error_code
+                        );
+                    }
                 }
             }
         }
