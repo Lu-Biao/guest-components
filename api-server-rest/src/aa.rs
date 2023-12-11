@@ -4,6 +4,7 @@
 //
 
 use crate::router::ApiHandler;
+use crate::ttrpc_proto::attestation_agent::ExtendRuntimeMeasurementRequest;
 use crate::ttrpc_proto::attestation_agent::{GetEvidenceRequest, GetTokenRequest};
 use crate::ttrpc_proto::attestation_agent_ttrpc::AttestationAgentServiceClient;
 use anyhow::*;
@@ -20,6 +21,7 @@ pub const AA_ROOT: &str = "/aa";
 /// URL for querying CDH get resource API
 const AA_TOKEN_URL: &str = "/token";
 const AA_EVIDENCE_URL: &str = "/evidence";
+const AA_MEASUREMENT_URL: &str = "/measurement";
 
 pub struct AAClient {
     client: AttestationAgentServiceClient,
@@ -75,6 +77,16 @@ impl ApiHandler for AAClient {
                 }
                 None => return self.bad_request(),
             },
+            AA_MEASUREMENT_URL => match params.get("event") {
+                Some(event) => {
+                    let results = self
+                        .extend_runtime_measurement(&event.clone().into_bytes())
+                        .await
+                        .unwrap_or_else(|e| e.to_string().into());
+                    return self.octet_stream_response(results);
+                }
+                None => return self.bad_request(),
+            },
 
             _ => {
                 return self.not_found();
@@ -117,5 +129,18 @@ impl AAClient {
             .get_evidence(ttrpc::context::with_timeout(TTRPC_TIMEOUT), &req)
             .await?;
         Ok(res.Evidence)
+    }
+
+    pub async fn extend_runtime_measurement(&self, event: &[u8]) -> Result<Vec<u8>> {
+        let req = ExtendRuntimeMeasurementRequest {
+            Events: vec![event.to_vec()],
+            ..Default::default()
+        };
+        let _ = self
+            .client
+            .extend_runtime_measurement(ttrpc::context::with_timeout(TTRPC_TIMEOUT), &req)
+            .await?;
+
+        Ok(vec![])
     }
 }
