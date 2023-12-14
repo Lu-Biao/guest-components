@@ -29,7 +29,7 @@ use crate::{
 const RCAR_MAX_ATTEMPT: i32 = 5;
 
 /// The interval (seconds) between RCAR handshake retries.
-const RCAR_RETRY_TIMEOUT_SECOND: u64 = 1;
+const RCAR_RETRY_TIMEOUT_SECOND: u64 = 2;
 
 #[derive(Deserialize, Debug, Clone)]
 struct AttestationResponseData {
